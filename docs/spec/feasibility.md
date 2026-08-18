@@ -1,13 +1,13 @@
 # 可行性评估
 
-> 本文档由一次基于真实 DSH 环境源码 / 插件的评估沉淀而来，作为「灵机一动」立项的技术可行性依据。
+> 本文档由一次基于真实 DSH 环境源码 / 插件的评估沉淀而来，作为「随手抽屉」立项的技术可行性依据。
 > 评估时间：2026-08。DSH 版本：0.1.x（rc）。
 
 ---
 
 ## 结论：完全可行，且这套环境几乎是为它准备的
 
-「灵机一动」的每个需求都能映射到已存在的 DSH 原生机制上，**不需要改框架、不需要 hack**。唯一要自研的是「选区捕获」这一段 DOM 交互，其余全是「组装现成积木」。
+「随手抽屉」的每个需求都能映射到已存在的 DSH 原生机制上，**不需要改框架、不需要 hack**。唯一要自研的是「选区捕获」这一段 DOM 交互，其余全是「组装现成积木」。
 
 ---
 
@@ -15,10 +15,10 @@
 
 | 你的需求 | 落地机制（已核实） | 难度 |
 |---|---|---|
-| 选中文字/词组 → 存进灵感库 | 客户端插件挂 `document` 级 `mouseup`/`selectionchange` 监听，`window.getSelection().toString()` 取文本；点「灵机一动」浮钮存入宿主 | 中（唯一自研段） |
-| 灵感库持久化 | 宿主用 `@deepseek-ai/dsh-storage-domain`（`defineDomain`/`domainTable`，schema 校验落盘，`message-feedback` 官方插件同款）或更简单的 `storage` JSON 服务 | 低 |
+| 选中文字/词组 → 存进抽屉 | 客户端插件挂 `document` 级 `mouseup`/`selectionchange` 监听，`window.getSelection().toString()` 取文本；点「随手抽屉」浮钮存入宿主 | 中（唯一自研段） |
+| 抽屉持久化 | 宿主用 `@deepseek-ai/dsh-storage-domain`（`defineDomain`/`domainTable`，schema 校验落盘，`message-feedback` 官方插件同款）或更简单的 `storage` JSON 服务 | 低 |
 | 页面小窗口（浮窗 UI） | 客户端 `ctx.slots.inject("shell.overlay", ...)` —— 官方文档明确写着：「frame-wide floating layer, additive, click-through」，就是给自定义浮层预留的槽位 | 低 |
-| 从灵感库选 1~N 条叠加追问 | 浮窗里多选条目 + 选中文本，组装成一段 query 文本 | 低 |
+| 从抽屉选 1~N 条叠加追问 | 浮窗里多选条目 + 选中文本，组装成一段 query 文本 | 低 |
 | 追问是否加入上下文 | 加开关；上下文来源二选一/三选一（见下） | 中 |
 | 追问并回传答案 | 宿主注册自己的 remote 命名空间（`message-feedback` 的 `remote.messageFeedback` 是现成范式），`ask({query, context})` 里直接 `ctx.llm.stream({ provider, model, system, messages, ... })` 跑一条独立查询，答案流式/一次性回传浮窗 | 中 |
 
@@ -47,8 +47,8 @@
 
 - **形态 = hybrid**（宿主 remote + 存储 + LLM；客户端 UI 面板 + 选区监听）。
   `dev_scaffold_plugin` 的 `hybrid`/`ui-panel` 形态为此设计，注入即 host+UI 双生效、可热重载、卸载即净。
-- **MVP**：选区 → 存灵感库 → 浮窗列出/删除 → 选 1 条或多条 → 浮窗内追问 → 宿主 `llm.stream` 回答案（上下文先做「选中文本 + 手动开关」，宿主解析整段会话做二期）。
-- **二期**：整段对话上下文开关、灵感库打标签/去重/按会话归档、追问改走完整 agent。
+- **MVP**：选区 → 存抽屉 → 浮窗列出/删除 → 选 1 条或多条 → 浮窗内追问 → 宿主 `llm.stream` 回答案（上下文先做「选中文本 + 手动开关」，宿主解析整段会话做二期）。
+- **二期**：整段对话上下文开关、抽屉打标签/去重/按会话归档、追问改走完整 agent。
 
 ---
 
@@ -88,6 +88,6 @@
 
 1. **「上下文」来源**：宿主解析整段对话 / 只带选中文本+手动追加 / 会话作用域隐形组件灌数据。
 2. **「临时追问」深度**：一次性无工具问答（MVP） / 完整 agent turn（二期）。
-3. **命名**：「灵感库」与浮窗的中文名待定。
+3. **命名**：已定为「随手抽屉」，存储地叫「抽屉」（原为待决，现已定）。
 
 > 完整清单见 [`docs/issues/open-questions.md`](../issues/open-questions.md)。

@@ -1,10 +1,10 @@
-# Handy Drawer · 随手抽屉
+# Stash · 随手抽屉
 
 [中文](README.md) | **English**
 
 > A DSH plugin that stashes "look-up / ask later" snippets while you work, then lets you pick one to ask on the spot — all **low-interruption, without breaking flow**.
 
-Working package name `dsh-handy-drawer` (directory is currently `dsh-brainwave`; rename pending).
+Working package name `dsh-stash`.
 
 ---
 
@@ -14,9 +14,9 @@ Working package name `dsh-handy-drawer` (directory is currently `dsh-brainwave`;
 
 - **Stash instantly**: select → save, no dialogs, no new tabs.
 - **Ask in place**: follow up inside a small window on the current page.
-- Stay focused now; the drawer holds your thoughts until you're ready.
+- Stay focused now; your stash holds your thoughts until you're ready.
 
-The name "Handy Drawer" captures the idea — **"handy" = low-friction, effortless; "drawer" = storage, pull one (or a few) back out later and ask right there**. Both actions — stashing and asking — are covered.
+The name "Stash" captures the idea — like `git stash`: set something aside without breaking your flow, then come back to it later. Both actions — stashing and asking — are covered.
 
 ---
 
@@ -24,20 +24,20 @@ The name "Handy Drawer" captures the idea — **"handy" = low-friction, effortle
 
 ### Use Case 1 · Quick Capture (stay focused)
 
-> On the current chat page, select a piece of text or a phrase and add it to a place (**the Drawer**; originally "Inspiration Library" — name TBD) for storage, so you stay focused on the current conversation; you can do the extra conversation or Q&A later.
+> On the current chat page, select a piece of text or a phrase and add it to a place (**your stash**; originally "Inspiration Library" — name TBD) for storage, so you stay focused on the current conversation; you can do the extra conversation or Q&A later.
 
 - **Trigger**: while reading info, opening files, or reading replies, you hit an **unfamiliar keyword** or an **inspiring passage** worth revisiting.
-- **Action**: select the text → stash it into the Drawer.
+- **Action**: select the text → tuck it into your stash.
 - **Effect**: low interruption, flow preserved — stay focused now, process later.
 
 ### Use Case 2 · Pick & Ask (follow up later)
 
-> On the current chat page, select a piece of text or a phrase, or pick from the Drawer — one item or several — and overlay a temporary follow-up question in a small window on the current page. When asking, choose whether to include the current context.
+> On the current chat page, select a piece of text or a phrase, or pick from your stash — one item or several — and overlay a temporary follow-up question in a small window on the current page. When asking, choose whether to include the current context.
 
 - **Sources (single or multiple)**:
   1. a selected passage/phrase in the chat;
-  2. one item from the Drawer;
-  3. one or more items from the Drawer.
+  2. one item from your stash;
+  3. one or more items from your stash.
 - **Presentation**: ask inside a small window overlaid on the current page — no new tab, no broken flow.
 - **Key option**: choose whether to **include context** — with context the question carries the current conversation; without it, it is answered independently around the selected content.
 
@@ -70,7 +70,7 @@ The name "Handy Drawer" captures the idea — **"handy" = low-friction, effortle
 ## Status
 
 - [ ] Stage: **Spec** (project started; no code yet)
-- [ ] Next: rename directory/package `dsh-brainwave` → `dsh-handy-drawer`; resolve open questions; scaffold into MVP.
+- [ ] Next: resolve open questions; scaffold into MVP.
 
 ---
 

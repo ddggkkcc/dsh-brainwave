@@ -6,18 +6,18 @@
 
 ## 职责
 1. 选区捕获（`document` mouseup / selectionchange → `getSelection().toString()`）。
-2. 选区旁「灵机一动」浮钮（收藏 / 追问）。
-3. `shell.overlay` 浮窗：灵感库列表（列/删/多选）+ 追问输入 + 「是否加入上下文」开关 + 结果区。
-4. 通过 `ctx.remote.brainwave.*` 调宿主。
+2. 选区旁「随手抽屉」浮钮（收藏 / 追问）。
+3. `shell.overlay` 浮窗：抽屉列表（列/删/多选）+ 追问输入 + 「是否加入上下文」开关 + 结果区。
+4. 通过 `ctx.remote.stash.*` 调宿主。
 
 ## 依赖（inject）
 - `slots`（`shell.overlay`）
-- `remote`（`remote.brainwave`）
+- `remote`（`remote.stash`）
 - `locale`（文案字典）
 - （二期）`conversation.chat.assistant-actions` 收藏入口
 
 ## 关键实现要点
-- 浮窗注册进 `shell.overlay`，`id` 自定（如 `brainwave`），容器 `pointer-events: auto`。
+- 浮窗注册进 `shell.overlay`，`id` 自定（如 `stash`），容器 `pointer-events: auto`。
 - 选区浮钮作为渐进增强：定位不精确时，浮窗内仍可手动输入追问兜底。
 - 选区监听 / 浮窗 DOM 生命周期与 `ctx.effect` 对齐，卸载即清理。
 - `includeContext=false` 时不从客户端传会话数据。

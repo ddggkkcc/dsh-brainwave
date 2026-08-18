@@ -5,8 +5,8 @@
 ---
 
 ## 职责
-1. 注册 remote 命名空间 `brainwave`（`list` / `save` / `remove` / `ask`）。
-2. 灵感条目持久化（`storage-domain`）。
+1. 注册 remote 命名空间 `stash`（`list` / `save` / `remove` / `ask`）。
+2. 抽屉条目持久化（`storage-domain`）。
 3. `ask` 调用 `ctx.llm.stream` 跑一次性追问（二期：读会话上下文）。
 
 ## 依赖（inject）
@@ -29,7 +29,7 @@
 ```
 src/host/
   index.ts        # 插件入口（name / inject / apply）
-  remote.ts       # brainwave remote 命名空间
-  storage.ts      # 灵感条目持久化
+  remote.ts       # stash remote 命名空间
+  storage.ts      # 抽屉条目持久化
   ask.ts          # LLM 追问
 ```

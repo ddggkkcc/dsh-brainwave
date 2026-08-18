@@ -1,6 +1,6 @@
 # 数据模型
 
-> 灵感库持久化的数据定义。宿主侧负责 schema 校验与落盘。
+> 抽屉持久化的数据定义。宿主侧负责 schema 校验与落盘。
 
 ---
 
@@ -13,12 +13,12 @@
 
 ---
 
-## 灵感条目 Schema（zod）
+## 抽屉条目 Schema（zod）
 
 ```ts
 import { z } from "zod";
 
-const brainwaveItemSchema = z.object({
+const stashItemSchema = z.object({
   id: z.uuid(),
   text: z.string().min(1),             // 收藏内容，非空
   source: z.string().optional(),       // 来源会话 id 或备注
@@ -33,11 +33,11 @@ const brainwaveItemSchema = z.object({
 ```ts
 import { defineDomain, domainTable } from "@deepseek-ai/dsh-storage-domain";
 
-const brainwaveDomainSpec = defineDomain({
-  name: "brainwave",
+const stashDomainSpec = defineDomain({
+  name: "stash",
   version: 0,
   tables: {
-    items: domainTable(z.array(brainwaveItemSchema)),
+    items: domainTable(z.array(stashItemSchema)),
   },
 });
 ```
@@ -48,7 +48,7 @@ const brainwaveDomainSpec = defineDomain({
 
 - `id`：全局唯一（uuid），不依赖会话。
 - `text`：只存原文，不自动截断（MVP）；超长可二期加上限。
-- 条目与「来源会话」是弱关联（`source` 只存 id 文本，不强制外键）——灵感库是**跨会话的全局抽屉**。
+- 条目与「来源会话」是弱关联（`source` 只存 id 文本，不强制外键）——抽屉是**跨会话的全局抽屉**。
 - 删除即物理删除（MVP）；二期可考虑软删/归档。
 
 ---

@@ -9,8 +9,8 @@
 - [ ] 【P0】拍板 `open-questions.md` 三项待决（上下文来源 / 追问深度 / 命名）
 - [ ] 【P0】确定存储方案（storage-domain vs storage JSON）
 - [ ] 【P1】`dev_scaffold_plugin` 生成 hybrid 骨架
-- [ ] 【P1】宿主端：`brainwave` remote 空壳（list/save/remove/ask）
-- [ ] 【P1】宿主端：storage 接入（灵感条目落盘）
+- [ ] 【P1】宿主端：`stash` remote 空壳（list/save/remove/ask）
+- [ ] 【P1】宿主端：storage 接入（抽屉条目落盘）
 - [ ] 【P1】客户端：`shell.overlay` 浮窗空壳
 - [ ] 【P1】客户端：选区捕获原型（mouseup/selectionchange → 浮钮）
 - [ ] 【P1】构建 + 注入 + 热重载 + 卸载自检
@@ -20,7 +20,7 @@
 ## M1 — MVP
 
 - [ ] 选区浮钮「收藏」→ `save` → 持久化
-- [ ] 灵感库列表渲染 + 删除
+- [ ] 抽屉列表渲染 + 删除
 - [ ] 浮窗追问：单条 / 多条选择 + 自定义问题输入
 - [ ] 「是否加入上下文」开关（MVP：选中文本 + 手动追加）
 - [ ] 宿主 `ask`：`ctx.llm.stream` 一次性答案回传
@@ -42,7 +42,7 @@
 ## M3 — 增强（待排期）
 
 - [ ] 完整 agent turn 追问
-- [ ] 灵感库全局搜索 / 多会话共享
+- [ ] 抽屉全局搜索 / 多会话共享
 - [ ] 快捷键收藏 / 追问
 - [ ] 设置页（默认开关 / 命名自定义）
 

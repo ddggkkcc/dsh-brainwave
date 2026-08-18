@@ -1,10 +1,10 @@
-# 随手抽屉 · Handy Drawer
+# 随手抽屉 · Stash
 
 **中文** | [English](README.en.md)
 
 > 使用 AI 时随手把「稍后再查 / 再问」的片段收起来放到「抽屉」，需要时直接从「抽屉」里拿取地追问 —— 全程**低打扰、不打断心流**。
 
-> 工作包名暂定 `dsh-handy-drawer`（目录名现为 `dsh-brainwave`，改名待办）。
+> 工作包名 `dsh-stash`。
 
 ---
 
@@ -80,7 +80,7 @@
 ## 当前状态
 
 - [ ] 阶段：**规范阶段**（SDD 立项，尚未开始写代码）
-- [ ] 待办：目录/包名 `dsh-brainwave` → `dsh-handy-drawer`；确认 [`open-questions.md`](docs/issues/open-questions.md) 关键待决项；随后生成插件骨架进入 MVP。
+- [ ] 待办：确认 [`open-questions.md`](docs/issues/open-questions.md) 关键待决项；随后生成插件骨架进入 MVP。
 
 ---
 

@@ -4,13 +4,13 @@
 
 ---
 
-## 1. 宿主 remote 命名空间：`brainwave`
+## 1. 宿主 remote 命名空间：`stash`
 
-宿主通过 Typert Remote 暴露 `remote.brainwave`，方法如下（返回统一 `{ ok: true, value }` / `{ ok: false, error: { code, message } }` 信封）。
+宿主通过 Typert Remote 暴露 `remote.stash`，方法如下（返回统一 `{ ok: true, value }` / `{ ok: false, error: { code, message } }` 信封）。
 
 ```ts
-// —— 灵感条目 ——
-interface BrainwaveItem {
+// —— 抽屉条目 ——
+interface StashItem {
   id: string          // uuid
   text: string        // 收藏的文本/词组（非空）
   source?: string     // 来源：当前会话 id / 'selection' / 备注（可选）
@@ -33,8 +33,8 @@ interface AskResult {
 ### 方法签名
 
 ```ts
-list():   Promise<Envelope<BrainwaveItem[]>>
-save(input: { text: string; source?: string }): Promise<Envelope<BrainwaveItem>>
+list():   Promise<Envelope<StashItem[]>>
+save(input: { text: string; source?: string }): Promise<Envelope<StashItem>>
 remove(input: { id: string }): Promise<Envelope<null>>
 ask(input: AskRequest): Promise<Envelope<AskResult>>
 ```
@@ -53,18 +53,18 @@ ask(input: AskRequest): Promise<Envelope<AskResult>>
 ```ts
 ctx.slots.inject("shell.overlay", () => ctx.slots.register({
   name: "shell.overlay",
-  id: "brainwave",           // 自定 id，不占用官方 id
+  id: "stash",           // 自定 id，不占用官方 id
   order: 100,
 }, OverlayPanel))             // React 组件
 ```
-- 组件内实现：灵感库列表（列/删/多选）、追问输入、是否加上下文开关、结果区。
+- 组件内实现：抽屉列表（列/删/多选）、追问输入、是否加上下文开关、结果区。
 - 层默认 click-through，浮窗容器需 `pointer-events: auto`。
 
 ### 2.2 消息级入口（可选，二期）
 ```ts
 ctx.slots.inject("conversation.chat.assistant-actions", () => ctx.slots.register({
   name: "conversation.chat.assistant-actions",
-  id: "brainwave-collect",   // 自定 id
+  id: "stash-collect",   // 自定 id
   order: 100,
 }, CollectAction))           // 单条「收藏此条」按钮
 ```
@@ -81,7 +81,7 @@ ctx.slots.inject("conversation.chat.assistant-actions", () => ctx.slots.register
 
 ```ts
 interface ClientState {
-  items: BrainwaveItem[]          // 灵感库缓存
+  items: StashItem[]          // 抽屉缓存
   selectionText: string | null    // 当前选区文本
   askQuery: string                // 追问输入
   includeContext: boolean         // 是否加上下文开关
@@ -99,7 +99,7 @@ interface ClientState {
 | `text-blank` | 收藏内容为空 | 「请先选中文字」 |
 | `query-blank` | 追问内容为空 | 「请输入或选中要追问的内容」 |
 | `llm-error` | LLM 调用失败 | 展示宿主返回的 message |
-| `storage-error` | 持久化失败 | 「灵感库保存失败」 |
+| `storage-error` | 持久化失败 | 「抽屉保存失败」 |
 | `transport` | 远程调用失败 | 「请求失败，请重试」 |
 
 ---
