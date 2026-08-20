@@ -79,9 +79,12 @@
 
 ## 当前状态
 
-- [ ] 阶段：**规范阶段**（SDD 立项，尚未开始写代码）
+- [x] 阶段：**M1 核心追问链路已接通**（2026-08-20）
+  - hybrid 插件：宿主 `StashService`（`stash` remote 命名空间 + storage-domain 持久化 + `ctx.llm.stream` 一次性追问）+ 客户端 `shell.overlay` 浮窗（开合/选区捕获/收藏删除/追问）。
+  - 构建链路：`scripts/build.sh`（host → `lib/host/`）+ `npm run build:client`（tsdown → `lib/client.js`）实测零报错。
+  - 注入链路：super-injector HTTP API 实测注入 → 自检（host ✓ / client ✓ / boot manifest 收录）→ 卸载 → 重注成功；卸载无功能残留（junction 删除有 injector 侧 macOS bug，见 [`scripts/README.md`](scripts/README.md)）。
 - [x] 待决项已全部拍板（2026-08-20，见 [`open-questions.md`](docs/issues/open-questions.md)）
-- [ ] 下一步：`dev_scaffold_plugin` 生成 hybrid 骨架，进入 M0 → MVP。
+- [ ] 下一步：浏览器目检真实 LLM 追问与上下文开关 → 补多条收藏 + 自定义问题合并、点击外部收起和 AC-1~AC-5 回归。
 
 ---
 

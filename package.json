@@ -1,0 +1,57 @@
+{
+  "name": "@dsh-external/dsh-stash",
+  "version": "0.0.1",
+  "description": "随手抽屉（Stash）：把聊天中的选中文字收进抽屉，稍后在浮窗里追问（hybrid 形态）",
+  "private": true,
+  "type": "module",
+  "main": "./lib/host/index.js",
+  "types": "./lib/types/host/index.d.ts",
+  "files": ["lib"],
+  "license": "BSD-3-Clause",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-storage-domain": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-llm": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-typert-protocol": ">=0.0.1-rc <2",
+    "zod": "^4.4.0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": { "optional": true },
+    "@deepseek-ai/dsh-storage-domain": { "optional": true },
+    "@deepseek-ai/dsh-llm": { "optional": true },
+    "@deepseek-ai/dsh-typert-protocol": { "optional": true },
+    "zod": { "optional": true }
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "tsdown": "^0.22.14",
+    "typescript": "^5.9.0"
+  },
+  "scripts": {
+    "build": "bash scripts/build.sh",
+    "build:client": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && npm run build:client && node --test tests/*.test.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/types/host/index.d.ts",
+      "default": "./lib/host/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "platform": "web"
+    }
+  }
+}

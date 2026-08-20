@@ -56,3 +56,10 @@
   2. 选区触发比终端输入更轻；
   3. 追问结果是否留档：MVP 对齐 `/btw` 的「看完即弃」，留档放 M3。
 - **理由**：同形态已被真实产品验证，降低设计风险；同时保留 Web 场景的差异化空间。
+
+## ADR-009 宿主 peer 依赖 = 真实路径解析（`runtime.ts`）
+- **状态**：已接受（2026-08-20 修复「请求失败，请重试」）
+- **背景**：外部插件经 junction/symlink 链入运行中 app；实测 ESM 沿 symlink 路径加载 `@deepseek-ai/dsh-typert-protocol` 会产生第二份模块实例，`@Remote` 标记写进该实例的模块级 WeakMap，宿主 gateway 用真实路径实例读不到 → `stash/*` 端点全部 `invocation-unavailable`，客户端表现为「请求失败，请重试」。
+- **决策**：宿主端新增 `src/host/runtime.ts`，用 `createRequire(import.meta.url).resolve()`（CJS 默认 realpath）解出运行中 app 的真实路径，再以绝对 file URL `import()`；`cordis` / `typert-protocol` / `storage-domain` 一律从这里导入。
+- **理由**：CJS resolve 默认 realpath，绕开 symlink 路径的模块分身，保证插件与 gateway 共享同一模块实例，`@Remote` 标记对账一致。
+- **约束**：后续新增 `@deepseek-ai/*` 运行时依赖，宿主侧禁止直接裸 import，必须经 `runtime.ts`。

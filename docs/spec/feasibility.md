@@ -15,7 +15,7 @@
 
 | 你的需求 | 落地机制（已核实） | 难度 |
 |---|---|---|
-| 选中文字/词组 → 存进抽屉 | 客户端插件挂 `document` 级 `mouseup`/`selectionchange` 监听，`window.getSelection().toString()` 取文本；点「随手抽屉」浮钮存入宿主 | 中（唯一自研段） |
+| 选中文字/词组 → 存进抽屉 | 客户端插件挂 `document` 级 `mouseup`/`selectionchange` 监听，`window.getSelection().toString()` 取文本；选区旁浮出 Notion 式菜单，点「加入抽屉」存入宿主 | 中（唯一自研段） |
 | 抽屉持久化 | 宿主用 `@deepseek-ai/dsh-storage-domain`（`defineDomain`/`domainTable`，schema 校验落盘，`message-feedback` 官方插件同款）或更简单的 `storage` JSON 服务 | 低 |
 | 页面小窗口（浮窗 UI） | 客户端 `ctx.slots.inject("shell.overlay", ...)` —— 官方文档明确写着：「frame-wide floating layer, additive, click-through」，就是给自定义浮层预留的槽位 | 低 |
 | 从抽屉选 1~N 条叠加追问 | 浮窗里多选条目 + 选中文本，组装成一段 query 文本 | 低 |
@@ -27,7 +27,7 @@
 ## 三条最值得注意的设计点（待拍板）
 
 ### 1. 选区捕获是 DOM 层交互，不是「槽位」API
-官方槽位里没有「选中文本」这一概念——它得靠你监听 `document` 选区事件、判断选区是否落在对话内容容器内、再在选区旁弹一个小按钮。
+官方槽位里没有「选中文本」这一概念——它得靠你监听 `document` 选区事件、判断选区是否落在对话内容容器内、再在选区旁弹一个 Notion 式小菜单（加入抽屉 / 追问）。
 - **可行**：注入器自己的 UI 已经在直接操作 `document.body`/`createElement`，说明客户端插件有完整 DOM 权限。
 - **注意**：对话 DOM 结构变化时的鲁棒性；建议用 `getSelection()` 的纯文本 + 容器归属判断，而不是依赖具体 class 名。
 
