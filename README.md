@@ -73,14 +73,15 @@
 - [`docs/spec/feasibility.md`](docs/spec/feasibility.md) — **可行性评估（结论：完全可行）**
 - [`docs/spec/api-contract.md`](docs/spec/api-contract.md) — 宿主 remote API + 客户端槽位契约
 - [`docs/plan/roadmap.md`](docs/plan/roadmap.md) — 里程碑
-- [`docs/issues/open-questions.md`](docs/issues/open-questions.md) — **当前需要处理的问题**
+- [`docs/issues/open-questions.md`](docs/issues/open-questions.md) — 待决项（2026-08-20 已全部拍板）
 
 ---
 
 ## 当前状态
 
 - [ ] 阶段：**规范阶段**（SDD 立项，尚未开始写代码）
-- [ ] 待办：确认 [`open-questions.md`](docs/issues/open-questions.md) 关键待决项；随后生成插件骨架进入 MVP。
+- [x] 待决项已全部拍板（2026-08-20，见 [`open-questions.md`](docs/issues/open-questions.md)）
+- [ ] 下一步：`dev_scaffold_plugin` 生成 hybrid 骨架，进入 M0 → MVP。
 
 ---
 

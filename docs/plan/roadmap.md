@@ -8,7 +8,7 @@
 ## M0 — 立项与骨架（当前）
 **目标**：确定规范与待决项，生成可运行的插件骨架。
 
-- [ ] 确认 [`open-questions.md`](../issues/open-questions.md) 三个待决项
+- [x] 确认 [`open-questions.md`](../issues/open-questions.md) 全部待决项（2026-08-20 已拍板）
 - [ ] `dev_scaffold_plugin` 生成 **hybrid** 骨架
 - [ ] 宿主端：remote 命名空间 `stash` 空壳 + storage 接入
 - [ ] 客户端：`shell.overlay` 浮窗空壳 + 选区捕获原型
@@ -25,7 +25,7 @@
 - [ ] FR-1 选区收藏（浮钮 + 持久化）
 - [ ] FR-2 抽屉列表 / 删除
 - [ ] FR-3 追问（选 1 条或多条 + 自定义问题 + 一次性 `llm.stream` 答案）
-- [ ] 「是否加入上下文」开关（MVP 先做「选中文本 + 手动追加」，宿主整段上下文后置）
+- [ ] 「是否加入上下文」开关：加入 = 宿主读当前会话最近 N 条消息拼入（带截断）；不加入 = 独立问答；两模式均不写主对话
 
 **交付物**：满足 [`requirements.md`](../requirements/requirements.md) 的 MVP 验收 AC-1~AC-5。
 **验收**：场景 A、B、C、D 基本可走通；不写进主对话（不加上下文时）。
@@ -35,7 +35,7 @@
 ## M2 — 上下文与体验（二期）
 **目标**：补齐「整段对话上下文」与追问体验。
 
-- [ ] 宿主侧解析当前会话消息（`session` / `session-query`），`includeContext=true` 时拼入 `messages`
+- [ ] 上下文能力增强：更长会话策略 / 摘要 / 截断优化（在 M1 最小版之上）
 - [ ] 追问改流式返回（可选）
 - [ ] 消息级入口：`conversation.chat.assistant-actions`「收藏此条」
 - [ ] 抽屉：打标签 / 去重 / 按会话归档（数据模型 v1）

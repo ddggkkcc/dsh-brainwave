@@ -6,8 +6,8 @@
 
 ## 当前聚焦（M0）
 
-- [ ] 【P0】拍板 `open-questions.md` 三项待决（上下文来源 / 追问深度 / 命名）
-- [ ] 【P0】确定存储方案（storage-domain vs storage JSON）
+- [x] 【P0】拍板 `open-questions.md` 全部待决（2026-08-20：上下文语义 / 一次性问答 / storage-domain / 全局抽屉）
+- [x] 【P0】确定存储方案 = `storage-domain`（2026-08-20 已拍板）
 - [ ] 【P1】`dev_scaffold_plugin` 生成 hybrid 骨架
 - [ ] 【P1】宿主端：`stash` remote 空壳（list/save/remove/ask）
 - [ ] 【P1】宿主端：storage 接入（抽屉条目落盘）
@@ -22,7 +22,7 @@
 - [ ] 选区浮钮「收藏」→ `save` → 持久化
 - [ ] 抽屉列表渲染 + 删除
 - [ ] 浮窗追问：单条 / 多条选择 + 自定义问题输入
-- [ ] 「是否加入上下文」开关（MVP：选中文本 + 手动追加）
+- [ ] 宿主读当前会话最近 N 条消息（最小版，带截断）+「是否加入上下文」开关（两模式均不写主对话）
 - [ ] 宿主 `ask`：`ctx.llm.stream` 一次性答案回传
 - [ ] 错误码与提示（text-blank / query-blank / llm-error …）
 - [ ] 验收 AC-1 ~ AC-5 回归
