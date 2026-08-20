@@ -49,6 +49,7 @@ const stashDomainSpec = defineDomain({
 - `id`：全局唯一（uuid），不依赖会话。
 - `text`：只存原文，不自动截断（MVP）；超长可二期加上限。
 - 条目与「来源会话」是弱关联（`source` 只存 id 文本，不强制外键）——抽屉是**跨会话的全局抽屉**。
+- MVP 阶段 `source` 暂不采集真实会话 id（客户端 `shell.overlay` 是 root 作用域，拿不到 `useSession`）：先存 `'selection'` 占位或省略；会话级来源 M2 与宿主上下文一起做。
 - 删除即物理删除（MVP）；二期可考虑软删/归档。
 
 ---

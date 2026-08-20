@@ -22,3 +22,8 @@ dev_uninject_plugin   # 卸载
 
 ## 说明
 - 当前为占位目录，脚本在 `dev_scaffold_plugin` 生成骨架后落地。
+
+## 本地开发环境（2026-08-20 确认）
+
+- DSH 运行时（`DSH_HOME`）：`~/.dsh`（profiles / sessions / storages / super-injector；启动 `dsh --profile web`，Web UI 默认 http://127.0.0.1:3080）
+- DSH 源码仓库：<https://github.com/deepseek-ai/deepseek-harness>（**尚未 clone 到本地**；`build.sh` 编译宿主端依赖 `DSH_CHECKOUT` 指认源码目录）
