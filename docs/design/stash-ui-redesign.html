@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>随手抽屉 · UI 重设计提案 v1</title>
+<style>
+  :root {
+    /* ── 底色：暖石墨（告别冷蓝灰 SaaS 味）── */
+    --bg: #21201f;            /* 面板底 */
+    --bg-raised: #2a2927;     /* hover 悬浮底 */
+    --bg-inset: #171615;      /* 输入框等内嵌面 */
+    /* ── 文字 ── */
+    --text-1: #ece8e2;
+    --text-2: #a9a29a;
+    --text-3: #736d65;
+    /* ── 线条：半透明 hairline，不用实色边框 ── */
+    --line: rgba(236, 232, 226, 0.08);
+    --line-2: rgba(236, 232, 226, 0.14);
+    /* ── 强调：鼠尾草绿，唯一强调色 ── */
+    --sage: #a3b8a6;
+    --sage-ink: #1d221e;      /* sage 实底上的深字 */
+    --sage-tint: rgba(163, 184, 166, 0.13);
+    --sage-line: rgba(163, 184, 166, 0.38);
+    --rose: #c99292;          /* 删除，哑玫瑰 */
+    --shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+    --r-panel: 16px;
+    --r-ctl: 8px;
+    --ease: cubic-bezier(0.2, 0, 0, 1);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #131312;
+    color: var(--text-1);
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 48px 32px 80px;
+    max-width: 1080px;
+    margin: 0 auto;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 { font-size: 17px; font-weight: 500; letter-spacing: 0.01em; }
+  h2 { font-size: 13px; font-weight: 500; color: var(--text-2); letter-spacing: 0.04em; margin: 56px 0 6px; }
+  .sub { color: var(--text-3); font-size: 12px; margin-top: 4px; }
+  .stage { margin-top: 20px; }
+
+  /* ───────── 色板对比 ───────── */
+  .swatches { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 20px; }
+  .swatch-row { display: flex; flex-direction: column; gap: 6px; }
+  .swatch-row .cells { display: flex; border-radius: 8px; overflow: hidden; border: 0.5px solid var(--line-2); }
+  .cell { width: 52px; height: 34px; }
+  .swatch-row .name { font-size: 12px; color: var(--text-3); }
+
+  /* ───────── 常驻入口 ───────── */
+  .entries { display: flex; align-items: center; gap: 32px; }
+  .entry-label { font-size: 12px; color: var(--text-3); margin-bottom: 8px; }
+  .fab {
+    display: inline-flex; align-items: center; gap: 8px;
+    height: 38px; padding: 0 12px; border-radius: 999px;
+    background: var(--bg); border: 0.5px solid var(--line-2);
+    color: var(--text-2); cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    transition: all 0.18s var(--ease);
+  }
+  .fab:hover { color: var(--text-1); border-color: var(--line-2); background: var(--bg-raised); }
+  .fab.expand { width: 38px; padding: 0; justify-content: center; overflow: hidden; }
+  .fab.expand:hover { width: 92px; padding: 0 14px; }
+  .fab .label { white-space: nowrap; font-size: 12px; opacity: 0; transition: opacity 0.18s var(--ease) 0.04s; }
+  .fab.expand:hover .label { opacity: 1; }
+
+  /* ───────── 面板 ───────── */
+  .panel-wrap { position: relative; display: inline-block; }
+  .panel {
+    width: 372px;
+    background: var(--bg);
+    border: 0.5px solid var(--line-2);
+    border-radius: var(--r-panel);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    animation: panelIn 0.18s var(--ease);
+    transform-origin: 100% 100%;
+  }
+  @keyframes panelIn { from { opacity: 0; transform: scale(0.97) translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .panel { animation: none; } }
+
+  .p-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 16px 0;
+  }
+  .p-head .ic { color: var(--sage); display: flex; }
+  .p-head .title { font-size: 13px; font-weight: 500; letter-spacing: 0.01em; }
+  .p-head .count { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; margin-left: 2px; }
+  .p-head .spacer { flex: 1; }
+  .tbtn {
+    background: none; border: none; color: var(--text-3);
+    font-size: 12px; padding: 4px 8px; border-radius: 6px;
+    cursor: pointer; font-family: inherit;
+    transition: all 0.12s var(--ease);
+  }
+  .tbtn:hover { color: var(--text-1); background: var(--bg-raised); }
+  .tbtn:disabled { color: var(--text-3); opacity: 0.4; cursor: default; background: none; }
+  .tbtn.danger:hover { color: var(--rose); background: rgba(201, 146, 146, 0.09); }
+
+  /* 追问区：留白分区，不画线 */
+  .ask { padding: 14px 16px 4px; }
+  .ask-row { display: flex; gap: 8px; }
+  .ask-input {
+    flex: 1; min-width: 0; height: 32px; padding: 0 10px;
+    background: var(--bg-inset); border: 0.5px solid transparent;
+    border-radius: var(--r-ctl); color: var(--text-1);
+    font-size: 13px; font-family: inherit; outline: none;
+    transition: border-color 0.15s var(--ease);
+  }
+  .ask-input::placeholder { color: var(--text-3); }
+  .ask-input:focus { border-color: var(--sage-line); }
+  .ask-go {
+    width: 32px; height: 32px; border-radius: var(--r-ctl);
+    background: var(--sage); color: var(--sage-ink);
+    border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.12s var(--ease);
+  }
+  .ask-go:hover { background: #b3c6b5; }
+  .ask-ctx { display: flex; align-items: center; gap: 7px; margin-top: 10px; font-size: 12px; color: var(--text-2); cursor: pointer; user-select: none; }
+  .ask-ctx input { accent-color: var(--sage); width: 13px; height: 13px; margin: 0; }
+
+  /* 答案区：左侧 sage 引线，不做框 */
+  .answer { margin: 12px 16px 4px; padding: 2px 0 2px 12px; border-left: 2px solid var(--sage-line); color: var(--text-1); font-size: 12.5px; line-height: 1.7; }
+
+  /* 唯一一条 hairline，隔开标签墙 */
+  .hr { height: 0.5px; background: var(--line); margin: 14px 16px 0; }
+
+  .tags-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 0; }
+  .tags-hint { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .tags-head .ops { display: flex; gap: 2px; }
+
+  .tags {
+    display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start;
+    padding: 12px 16px 16px; max-height: 218px; overflow-y: auto;
+  }
+  .tags::-webkit-scrollbar { width: 4px; }
+  .tags::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 2px; }
+  .tag {
+    display: inline-flex; align-items: center; max-width: 100%;
+    height: 28px; padding: 0 11px; border-radius: 999px;
+    background: transparent; border: 0.5px solid var(--line-2);
+    color: var(--text-1); font-size: 12px; cursor: pointer;
+    transition: background 0.12s var(--ease), border-color 0.12s var(--ease), color 0.12s var(--ease);
+    user-select: none;
+  }
+  .tag:hover { background: var(--bg-raised); border-color: var(--line-2); }
+  .tag .txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+  .tag.sel { background: var(--sage-tint); border-color: var(--sage-line); color: #c9d8cb; }
+  .tag.sel .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--sage); margin-right: 7px; flex: none; }
+
+  /* Toast：面板顶部居中，毛玻璃 */
+  .toast {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 999px;
+    background: rgba(33, 32, 31, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 0.5px solid var(--line-2); font-size: 12px; color: var(--text-1);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    white-space: nowrap; z-index: 5;
+    animation: panelIn 0.16s var(--ease);
+  }
+
+  /* ───────── 状态矩阵 ───────── */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .card {
+    background: #181817; border: 0.5px solid var(--line);
+    border-radius: 12px; padding: 16px; position: relative;
+  }
+  .card .cap { font-size: 12px; color: var(--text-3); margin-bottom: 12px; }
+  .mini-panel { width: 100%; }
+
+  .empty { padding: 26px 0 30px; text-align: center; color: var(--text-3); font-size: 12px; }
+  .empty .ic { display: flex; justify-content: center; margin-bottom: 10px; color: var(--text-3); opacity: 0.7; }
+
+  .skeleton { display: flex; flex-direction: column; gap: 8px; }
+  .sk { height: 10px; border-radius: 4px; background: var(--bg-raised); animation: pulse 1.2s ease-in-out infinite; }
+  .sk:nth-child(2) { width: 82%; animation-delay: 0.15s; }
+  .sk:nth-child(3) { width: 64%; animation-delay: 0.3s; }
+  @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+  .tri { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+  .spinner {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid var(--line-2); border-top-color: var(--sage);
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ───────── 令牌表 ───────── */
+  table { border-collapse: collapse; width: 100%; margin-top: 16px; font-size: 12.5px; }
+  th { text-align: left; font-weight: 500; color: var(--text-2); font-size: 12px; letter-spacing: 0.03em; padding: 8px 12px; border-bottom: 0.5px solid var(--line-2); }
+  td { padding: 8px 12px; border-bottom: 0.5px solid var(--line); color: var(--text-1); }
+  td.v { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: var(--text-2); }
+  td.u { color: var(--text-2); }
+  tr.group td { color: var(--text-3); font-size: 12px; padding-top: 18px; border-bottom: none; }
+  .chip { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 0.5px solid var(--line-2); vertical-align: -1.5px; margin-right: 7px; }
+
+  .notes { margin-top: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .note { background: #181817; border: 0.5px solid var(--line); border-radius: 10px; padding: 14px 16px; font-size: 12.5px; color: var(--text-2); line-height: 1.7; }
+  .note b { color: var(--text-1); font-weight: 500; display: block; margin-bottom: 4px; }
+  .note .old { color: var(--rose); }
+  .note .new { color: var(--sage); }
+</style>
+</head>
+<body>
+
+<h1>随手抽屉 · UI 重设计提案 v1</h1>
+<p class="sub">暖石墨 × 鼠尾草绿 · 单一强调色 · hairline 分区 · 克制动效 —— 目标：浮在聊天页上像一层安静的纸，而不是一个后台组件。</p>
+
+<h2>色调 · 现状 → 提案</h2>
+<p class="sub">饱和蓝 + 冷蓝灰 = 通用 SaaS 后台味；暖石墨 + 低饱和绿 = 安静、有辨识度、不抢正文的视觉权重。</p>
+<div class="swatches">
+  <div class="swatch-row">
+    <div class="cells">
+      <div class="cell" style="background:#1e2430"></div>
+      <div class="cell" style="background:#2b3245"></div>
+      <div class="cell" style="background:#3a4254"></div>
+      <div class="cell" style="background:#3b6ef0"></div>
+      <div class="cell" style="background:#e8eaf0"></div>
+    </div>
+    <div class="name">现状 · 冷蓝灰 + 饱和蓝</div>
+  </div>
+  <div class="swatch-row">
+    <div class="cells">
+      <div class="cell" style="background:#171615"></div>
+      <div class="cell" style="background:#21201f"></div>
+      <div class="cell" style="background:#2a2927"></div>
+      <div class="cell" style="background:#a3b8a6"></div>
+      <div class="cell" style="background:#ece8e2"></div>
+    </div>
+    <div class="name">提案 · 暖石墨 + 鼠尾草</div>
+  </div>
+</div>
+
+<h2>常驻入口（FR-4.2）</h2>
+<p class="sub">默认一枚 38px 圆形图标，悬停时横向展开出文字——平时几乎隐形，需要时自我说明。替代现在的长条 emoji 胶囊。</p>
+<div class="stage entries">
+  <div>
+    <div class="entry-label">静止 · 角落常驻</div>
+    <button class="fab expand" type="button">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 9h16v11H4z"/><path d="M4 9l2.5-5h11L20 9"/><path d="M10 13.5h4"/></svg>
+      <span class="label">抽屉</span>
+    </button>
+  </div>
+  <div>
+    <div class="entry-label">悬停 · 展开自述</div>
+    <button class="fab" type="button">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 9h16v11H4z"/><path d="M4 9l2.5-5h11L20 9"/><path d="M10 13.5h4"/></svg>
+      <span class="label">抽屉 · 7</span>
+    </button>
+  </div>
+</div>
+
+<h2>面板全貌（可交互 · 点标签试试多选）</h2>
+<p class="sub">分区靠留白而不是边框线；整块面板只保留一条 hairline。标签默认低调透明，选中才着色——选择是例外状态，理应比未选中更亮。</p>
+<div class="stage panel-wrap">
+  <div class="toast">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#a3b8a6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3.2L13 5"/></svg>
+    已收藏
+  </div>
+  <div class="panel">
+    <div class="p-head">
+      <span class="ic">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 9h16v11H4z"/><path d="M4 9l2.5-5h11L20 9"/><path d="M10 13.5h4"/></svg>
+      </span>
+      <span class="title">随手抽屉</span>
+      <span class="count" id="count">7 条</span>
+      <span class="spacer"></span>
+      <button class="tbtn" type="button">收起</button>
+    </div>
+
+    <div class="ask">
+      <div class="ask-row">
+        <input class="ask-input" placeholder="输入追问，或选中正文后点「追问」">
+        <button class="ask-go" type="button" title="追问">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M9 7h8v8"/></svg>
+        </button>
+      </div>
+      <label class="ask-ctx">
+        <input type="checkbox" checked>
+        加入对话上下文（不写入主会话）
+      </label>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="tags-head">
+      <span class="tags-hint" id="hint">点选标签，可单选 / 多选</span>
+      <span class="ops">
+        <button class="tbtn" type="button" id="all">全选</button>
+        <button class="tbtn" type="button" id="askSel" disabled>追问选中</button>
+        <button class="tbtn danger" type="button" id="del" disabled>删除</button>
+      </span>
+    </div>
+    <div class="tags" id="tags"></div>
+  </div>
+</div>
+
+<h2>状态矩阵</h2>
+<div class="stage grid">
+  <div class="card">
+    <div class="cap">空态 · 语气放松，不解释功能</div>
+    <div class="empty">
+      <div class="ic">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 9h16v11H4z"/><path d="M4 9l2.5-5h11L20 9"/></svg>
+      </div>
+      去正文划选一段文字，这里替你收着
+    </div>
+  </div>
+  <div class="card">
+    <div class="cap">追问中 · 按钮转 spinner，答案区骨架屏</div>
+    <div class="ask-row" style="margin-bottom:12px">
+      <div class="ask-input" style="display:flex;align-items:center;color:var(--text-2)">注意力衰减的三种缓解思路</div>
+      <div class="ask-go"><div class="spinner"></div></div>
+    </div>
+    <div class="skeleton"><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
+  </div>
+  <div class="card">
+    <div class="cap">答案 · 左侧引线，不做框</div>
+    <div class="answer" style="margin:0 0 12px">三种思路：① 滑窗 + 摘要压缩历史；② KV Cache 分级淘汰；③ 检索增强，按相关性回填上下文。各自代价不同……</div>
+    <div style="font-size:12px;color:var(--text-3)">答完即止，无关闭按钮，再问即覆盖</div>
+  </div>
+  <div class="card">
+    <div class="cap">标签三态 · 透明 → 微亮 → 鼠尾草着色</div>
+    <div class="tri">
+      <span class="tag"><span class="txt">KV Cache 淘汰策略</span></span>
+      <span class="tag" style="background:var(--bg-raised)"><span class="txt">注意力逐层衰减</span></span>
+      <span class="tag sel"><span class="dot"></span><span class="txt">软注意力稀释</span></span>
+    </div>
+  </div>
+</div>
+
+<h2>设计令牌（可直接映射 StashOverlay.tsx）</h2>
+<table>
+  <tr><th>令牌</th><th>值</th><th>用途</th></tr>
+  <tr class="group"><td colspan="3">底色 · 暖石墨三层</td></tr>
+  <tr><td><span class="chip" style="background:#171615"></span>bg-inset</td><td class="v">#171615</td><td class="u">输入框等内嵌面（最深）</td></tr>
+  <tr><td><span class="chip" style="background:#21201f"></span>bg</td><td class="v">#21201f</td><td class="u">面板底</td></tr>
+  <tr><td><span class="chip" style="background:#2a2927"></span>bg-raised</td><td class="v">#2a2927</td><td class="u">hover 悬浮底（最浅）</td></tr>
+  <tr class="group"><td colspan="3">文字 · 三级</td></tr>
+  <tr><td>text-1 / 2 / 3</td><td class="v">#ece8e2 / #a9a29a / #736d65</td><td class="u">正文 / 次要 / 提示与占位</td></tr>
+  <tr class="group"><td colspan="3">线条 · 半透明 hairline（替代实色 #3a4254）</td></tr>
+  <tr><td>line / line-2</td><td class="v">rgba(236,232,226,.08) / .14</td><td class="u">分隔线 / 控件描边</td></tr>
+  <tr class="group"><td colspan="3">强调 · 鼠尾草绿，全站唯一</td></tr>
+  <tr><td><span class="chip" style="background:#a3b8a6"></span>sage</td><td class="v">#a3b8a6</td><td class="u">主按钮、选中态、对勾、图标</td></tr>
+  <tr><td>sage-tint / sage-line</td><td class="v">rgba(163,184,166,.13) / .38</td><td class="u">选中标签底 / 描边、focus 环、答案引线</td></tr>
+  <tr><td>sage-ink</td><td class="v">#1d221e</td><td class="u">sage 实底上的深色文字</td></tr>
+  <tr><td><span class="chip" style="background:#c99292"></span>rose</td><td class="v">#c99292</td><td class="u">仅删除动作，hover 才显现</td></tr>
+  <tr class="group"><td colspan="3">比例与动效</td></tr>
+  <tr><td>圆角</td><td class="v">16 / 8 / 999</td><td class="u">面板 / 控件 / 标签与胶囊</td></tr>
+  <tr><td>间距阶梯</td><td class="v">4 · 8 · 12 · 16</td><td class="u">面板内边距 16，区块间靠留白分区</td></tr>
+  <tr><td>字号</td><td class="v">12 · 12.5 · 13</td><td class="u">提示 / 答案 / 正文，字重只用 400 与 500</td></tr>
+  <tr><td>动效</td><td class="v">160–180ms var(--ease)</td><td class="u">面板入场 scale .97→1；hover 120ms；无弹簧无缩放</td></tr>
+</table>
+
+<h2>为什么这样改</h2>
+<div class="notes">
+  <div class="note"><b>去饱和蓝，换鼠尾草</b>饱和蓝（<span class="old">#3b6ef0</span>）是所有后台系统的默认色，见得越多越廉价。低饱和绿（<span class="new">#a3b8a6</span>）在暖石墨上安静且自带辨识度，「自然」不是修辞——它的色相就是植物系的。</div>
+  <div class="note"><b>实线边框 → 半透明 hairline</b>现状满屏 1px <span class="old">#3a4254</span> 实线，每个区块都是一个盒子，廉价感主要来自这里。0.5px 半透明线在深底上若隐若现，整个面板只剩一条分隔线，其余靠留白分区。</div>
+  <div class="note"><b>文字只用两档字重</b>现状标题 600 太重，等于在喊。改 500 + 0.01em 字距，配合三级灰色，层级靠明度不靠粗细。emoji（🗂）全部换线性 SVG 图标。</div>
+  <div class="note"><b>比例：选择是例外，未选是常态</b>标签默认透明底，选中才着色；主按钮 sage 实底全站只有一个；删除平时是灰字，hover 才泛玫瑰色。视觉焦点永远少于两个，这叫克制。</div>
+  <div class="note"><b>动效只做入场</b>面板 180ms scale .97→1 + 淡入，原点在右下角（从入口按钮方向长出来）；标签 hover 120ms 换底色。没有弹跳、没有位移、没有循环动画——除了加载骨架屏。</div>
+  <div class="note"><b>为二期主题适配铺路</b>所有颜色走 CSS 变量，将来做浅色主题只需换一组 token 值，组件代码零改动（MVP 仍硬编码深色，范围纪律不变）。</div>
+</div>
+
+<script>
+  const data = ['注意力逐层衰减','KV Cache 淘汰策略','ctx.llm.stream 一次性汇总','软注意力稀释','工具调用幂等性','session 上下文截断','uuid v7 时间有序'];
+  const wrap = document.getElementById('tags');
+  const hint = document.getElementById('hint');
+  const askSel = document.getElementById('askSel');
+  const del = document.getElementById('del');
+  const all = document.getElementById('all');
+  let sel = new Set();
+
+  function render() {
+    wrap.innerHTML = '';
+    data.forEach((t, i) => {
+      const el = document.createElement('span');
+      el.className = 'tag' + (sel.has(i) ? ' sel' : '');
+      el.innerHTML = (sel.has(i) ? '<span class="dot"></span>' : '') + '<span class="txt"></span>';
+      el.querySelector('.txt').textContent = t;
+      el.onclick = () => { sel.has(i) ? sel.delete(i) : sel.add(i); render(); };
+      wrap.appendChild(el);
+    });
+    const n = sel.size;
+    hint.textContent = n > 0 ? '已选 ' + n + ' 条' : '点选标签，可单选 / 多选';
+    askSel.disabled = n === 0;
+    del.disabled = n === 0;
+    all.textContent = (n === data.length && n > 0) ? '清空' : '全选';
+  }
+  all.onclick = () => { sel = (sel.size === data.length) ? new Set() : new Set(data.map((_, i) => i)); render(); };
+  render();
+</script>
+</body>
+</html>

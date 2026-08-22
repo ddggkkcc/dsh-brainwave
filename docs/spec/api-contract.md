@@ -64,6 +64,8 @@ ctx.slots.inject("shell.overlay", () => ctx.slots.register({
 }, OverlayPanel))             // React 组件
 ```
 - 组件内实现：抽屉标签墙（圆角标签流式排列，点击标签单选/多选，选中后可「追问选中 / 删除选中」）、追问输入、是否加上下文开关、结果区。
+- 追问组装（FR-3.2 + FR-3.3）：追问文本 = 选中标签内容（多条以 `---` 分隔）+ 输入框追加内容（单标签直接拼接）；追问后最终文本物化进输入框并清空选中，避免重复追问翻倍。
+- 面板折叠三路径：`收起` 按钮、点击面板外空白（mousedown）、`Escape`；折叠后回到常驻入口（FR-4.2）。
 - 层默认 click-through，浮窗容器需 `pointer-events: auto`。
 
 ### 2.2 消息级入口（可选，二期）
@@ -75,11 +77,15 @@ ctx.slots.inject("conversation.chat.assistant-actions", () => ctx.slots.register
 }, CollectAction))           // 单条「收藏此条」按钮
 ```
 
-### 2.3 选区捕获（无槽位，纯 DOM）
-- 监听 `document` 的 `mouseup` / `selectionchange`，以及 `scroll`（滚动即收起菜单）。
-- `const sel = window.getSelection(); const text = sel?.toString().trim()`。
-- 判定 `sel` 是否落在对话内容容器内（用容器归属判断，不依赖具体 class）；同时排除 `input` / `textarea` / `[contenteditable]` 内的选区。
-- 非空时在选区附近渲染 **Notion 式选区菜单**：「加入抽屉」/「追问」，自动避让视口边缘（上方放不下则放选区下方）。
+### 2.3 选区捕获（哨兵探针 + 纯 DOM）
+- **触发时机**：`mouseup` 单次定位（菜单不跟随拖选过程抖动）；键盘选区（Shift+方向键）经 `selectionchange` 250ms 防抖后出现；`scroll`（捕获阶段）与选区折叠立即收起；`Escape` 收起。
+- **归属判定（三层漏斗）**：
+  - L0 廉价排除：浮窗自身 DOM、`input`/`textarea`/`[contenteditable]`、折叠选区、空文本；
+  - L1 容器归属：向 `conversation.chat.node`（keyed 槽位）注入隐形哨兵探针（`display:none` span，零渲染成本）。≥2 个探针的**最近公共祖先** = 消息列表容器（树结构事实，不依赖宿主 class）；仅 1 个探针时取探针最近的整幅可滚动祖先；容器 `contains(anchorNode)` 才放行；
+  - L2 内容校验：`getRangeAt(0).getBoundingClientRect()` 有效、视口钳制（上方放不下放下方）、位置只在菜单出现时计算一次。
+- **降级阶梯**（探针全部缺失 = 无会话或槽位失效）：锚点侧启发式——选区位于高度 ≥50% 视口的可滚动容器内才放行；容器解析失败 → fail-open（放行，行为等同旧版）。探针槽位注册抛错时 `console.warn` 一次（NFR-5 可观测），不阻塞浮窗其余功能。
+- 非空且放行时在选区附近渲染 **Notion 式选区菜单**：「加入抽屉」/「追问」。收藏成功后菜单**就地变形**为「已收藏」停留 800ms 再淡出并清空选区（FR-4.3 反馈不依赖抽屉面板开合）。
+- 视觉规格见 [`docs/design/stash-ui-redesign.html`](../design/stash-ui-redesign.html)（暖石墨 × 鼠尾草令牌表，MVP 硬编码深色，二期主题适配仅换 token 值）。
 
 ---
 
@@ -91,6 +97,7 @@ interface SelectionMenu {
   y: number                  // 菜单锚点 y
   placement: 'top' | 'bottom'
   text: string               // 选区文本
+  phase: 'actions' | 'collected' | 'exiting'   // 动作态 → 收藏后就地变形 → 淡出
 }
 
 interface ClientState {

@@ -1,17 +1,24 @@
 /**
  * shell.overlay 浮窗（api-contract.md §2.1）：Notion 式选区菜单 + 标签墙抽屉。
- * - 选区菜单：鼠标划选正文后，在选区附近浮出「加入抽屉 / 追问」两个动作；
- * - 抽屉内容：收藏以圆角标签排列，点击标签单选/多选，选中后可追问/删除；
- * - 层默认 click-through，浮窗容器须 pointer-events: auto；
- * - 常驻入口按钮（FR-4.2）M1 正式验收，M0 先落地最小开合；
- * - MVP 硬编码深色中性风（范围纪律：主题适配二期）。
+ *
+ * 选区捕获（api-contract.md §2.3，本文件只做 L0/L2 与触发时机，L1 归属见 selectionScope.ts）：
+ * - 触发：mouseup 单次定位（不跟拖选抖动）；键盘选区 selectionchange 250ms 防抖；
+ *   scroll（捕获）/ 选区折叠 / Escape 立即收起（100ms 淡出）；
+ * - 反馈：收藏成功菜单就地变形「已收藏」800ms 再淡出（FR-4.3，不依赖面板开合）。
+ *
+ * UI：docs/design/stash-ui-redesign.html v1 —— 暖石墨三层底 × 鼠尾草绿单一强调色，
+ * 半透明 hairline（面板只留一条分隔线，分区靠留白），字重只用 400/500，emoji 全部
+ * 换线性 SVG。样式走注入的 <style>（dsh-stash- 前缀类名）而非内联对象——hover、
+ * keyframes 动效（面板 180ms scale .97→1、菜单 140ms 淡入上浮、骨架屏、spinner）
+ * 内联样式表达不了。MVP 硬编码深色（范围纪律：主题适配二期仅换 token 值）。
  * @module @dsh-external/dsh-stash/StashOverlay
  */
 
 import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties, ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import type { TypertRemoteNamespaceMap } from '@deepseek-ai/dsh-typert-protocol'
 import type { StashItem } from '../host/types.js'
+import { isEditable, type ConversationScope } from './selectionScope.js'
 
 /** ctx.remote.stash（transport 信封包业务信封，双层判 ok，见 api-remotes 控制器范式）。 */
 type StashRemote = TypertRemoteNamespaceMap['stash']
@@ -21,194 +28,200 @@ interface SelectionMenu {
   readonly y: number
   readonly placement: 'top' | 'bottom'
   readonly text: string
+  readonly phase: 'actions' | 'collected' | 'exiting'
 }
 
-function isEditable(node: Node): boolean {
-  const element = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement
-  if (element === null) return false
-  return element.closest('input, textarea, [contenteditable="true"], [contenteditable=""]') !== null
+/** 键盘选区防抖：Shift+方向键没有 mouseup，稳定后才出现菜单。 */
+const KEYBOARD_SETTLE_MS = 250
+/** 收藏后就地变形停留时长，之后淡出并清空选区。 */
+const COLLECTED_LINGER_MS = 800
+/** 菜单淡出时长。 */
+const MENU_EXIT_MS = 100
+
+/* ── 设计令牌（docs/design/stash-ui-redesign.html，改动先回设计稿）── */
+const T = {
+  bg: '#21201f',
+  bgRaised: '#2a2927',
+  bgInset: '#171615',
+  text1: '#ece8e2',
+  text2: '#a9a29a',
+  text3: '#736d65',
+  line: 'rgba(236, 232, 226, 0.08)',
+  line2: 'rgba(236, 232, 226, 0.14)',
+  sage: '#a3b8a6',
+  sageInk: '#1d221e',
+  sageTint: 'rgba(163, 184, 166, 0.13)',
+  sageLine: 'rgba(163, 184, 166, 0.38)',
+  sageText: '#c9d8cb',
+  rose: '#c99292',
+} as const
+
+const CSS = `
+.dsh-stash-root { position: fixed; right: 16px; bottom: 16px; z-index: 2147483000; pointer-events: none; }
+@keyframes dsh-stash-in { from { opacity: 0; transform: translateY(4px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes dsh-stash-panel-in { from { opacity: 0; transform: scale(0.97) translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes dsh-stash-fade-out { to { opacity: 0; } }
+@keyframes dsh-stash-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+@keyframes dsh-stash-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .dsh-stash-menu, .dsh-stash-panel, .dsh-stash-fab, .dsh-stash-toast { animation: none !important; transition: none !important; }
 }
 
-const style: Record<string, CSSProperties> = {
-  floating: {
-    position: 'fixed',
-    right: 16,
-    bottom: 16,
-    zIndex: 2147483000,
-    pointerEvents: 'none',
-  },
-  pill: {
-    pointerEvents: 'auto',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '8px 14px',
-    background: '#2b3245',
-    color: '#e8eaf0',
-    border: '1px solid #3a4254',
-    borderRadius: 999,
-    cursor: 'pointer',
-    fontSize: 13,
-    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
-  },
-  menu: {
-    position: 'fixed',
-    zIndex: 2147483001,
-    display: 'flex',
-    gap: 6,
-    padding: 6,
-    background: '#2b3245',
-    border: '1px solid #3a4254',
-    borderRadius: 10,
-    boxShadow: '0 6px 24px rgba(0, 0, 0, 0.45)',
-    pointerEvents: 'auto',
-  },
-  menuButton: {
-    padding: '5px 10px',
-    borderRadius: 6,
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: 12,
-    whiteSpace: 'nowrap',
-  },
-  panel: {
-    pointerEvents: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    width: 360,
-    maxHeight: '70vh',
-    background: '#1e2430',
-    color: '#e8eaf0',
-    border: '1px solid #3a4254',
-    borderRadius: 12,
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.45)',
-    overflow: 'hidden',
-    fontSize: 13,
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '10px 14px',
-    borderBottom: '1px solid #3a4254',
-    fontSize: 14,
-    fontWeight: 600,
-  },
-  section: { padding: '10px 14px', borderBottom: '1px solid #2a3140' },
-  row: { display: 'flex', gap: 8, alignItems: 'center' },
-  input: {
-    flex: 1,
-    minWidth: 0,
-    padding: '6px 8px',
-    background: '#141924',
-    color: '#e8eaf0',
-    border: '1px solid #3a4254',
-    borderRadius: 6,
-    fontSize: 13,
-    outline: 'none',
-  },
-  checkboxRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    margin: '6px 0',
-    fontSize: 12,
-    color: '#c6cdda',
-  },
-  primary: {
-    padding: '6px 12px',
-    background: '#3b6ef0',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: 6,
-    cursor: 'pointer',
-    fontSize: 13,
-  },
-  ghost: {
-    padding: '4px 10px',
-    background: 'transparent',
-    color: '#9aa4b8',
-    border: '1px solid #3a4254',
-    borderRadius: 6,
-    cursor: 'pointer',
-    fontSize: 12,
-  },
-  danger: {
-    padding: '4px 10px',
-    background: 'transparent',
-    color: '#e08b8b',
-    border: '1px solid #5a3a3a',
-    borderRadius: 6,
-    cursor: 'pointer',
-    fontSize: 12,
-  },
-  tags: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 8,
-    padding: '10px 12px',
-    flex: 1,
-    minHeight: 0,
-    overflowY: 'auto',
-    alignContent: 'flex-start',
-  },
-  tag: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    maxWidth: '100%',
-    padding: '6px 12px',
-    borderRadius: 999,
-    border: '1px solid #3a4254',
-    background: '#232a3a',
-    color: '#e8eaf0',
-    cursor: 'pointer',
-    fontSize: 12,
-    lineHeight: '16px',
-    transition: 'background 0.12s ease, border-color 0.12s ease',
-  },
-  tagSelected: {
-    background: '#3b6ef0',
-    borderColor: '#6d8dff',
-    color: '#ffffff',
-  },
-  tagText: {
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    maxWidth: 200,
-  },
-  selectionBar: {
-    flexBasis: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 2,
-  },
-  selectionHint: { fontSize: 12, color: '#9aa4b8' },
-  answer: {
-    marginTop: 8,
-    padding: '8px 10px',
-    background: '#272f42',
-    borderRadius: 6,
-    whiteSpace: 'pre-wrap',
-    wordBreak: 'break-all',
-  },
-  toast: {
-    position: 'absolute',
-    top: 44,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    padding: '6px 12px',
-    background: '#141924',
-    border: '1px solid #3a4254',
-    borderRadius: 999,
-    fontSize: 12,
-    whiteSpace: 'nowrap',
-  },
-  empty: { padding: '12px 0', textAlign: 'center', color: '#6b7486', fontSize: 12 },
+.dsh-stash-menu {
+  position: fixed; z-index: 2147483001; display: flex; padding: 4px;
+  background: rgba(33, 32, 31, 0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 0.5px solid ${T.line2}; border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4); pointer-events: auto;
+  animation: dsh-stash-in 0.14s cubic-bezier(0.2, 0, 0, 1);
+}
+.dsh-stash-menu.exiting { animation: dsh-stash-fade-out ${MENU_EXIT_MS}ms ease forwards; pointer-events: none; }
+.dsh-stash-menu-item {
+  display: flex; align-items: center; gap: 5px; padding: 5px 10px; border: none;
+  border-radius: 6px; background: transparent; color: ${T.text1};
+  font-size: 12px; font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.dsh-stash-menu-item + .dsh-stash-menu-item {
+  border-left: 0.5px solid ${T.line2}; border-radius: 0 6px 6px 0; margin-left: 4px; padding-left: 12px;
+}
+.dsh-stash-menu-item:hover { background: rgba(236, 232, 226, 0.08); }
+.dsh-stash-menu-item.muted { color: ${T.text2}; }
+.dsh-stash-menu-done { display: flex; align-items: center; gap: 6px; padding: 5px 14px; color: ${T.sage}; font-size: 12px; }
+
+.dsh-stash-fab {
+  pointer-events: auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  width: 38px; height: 38px; padding: 0; border-radius: 999px; overflow: hidden;
+  background: ${T.bg}; border: 0.5px solid ${T.line2}; color: ${T.text2};
+  cursor: pointer; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: width 0.18s cubic-bezier(0.2, 0, 0, 1), background 0.18s cubic-bezier(0.2, 0, 0, 1), color 0.18s cubic-bezier(0.2, 0, 0, 1);
+}
+.dsh-stash-fab:hover { width: 96px; background: ${T.bgRaised}; color: ${T.text1}; }
+.dsh-stash-fab-label { opacity: 0; white-space: nowrap; font-size: 12px; transition: opacity 0.18s cubic-bezier(0.2, 0, 0, 1) 0.04s; }
+.dsh-stash-fab:hover .dsh-stash-fab-label { opacity: 1; }
+
+.dsh-stash-panel {
+  pointer-events: auto; display: flex; flex-direction: column; width: 372px; max-height: 70vh;
+  background: ${T.bg}; color: ${T.text1}; border: 0.5px solid ${T.line2}; border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+  overflow: hidden; font-size: 13px; font-family: inherit;
+  animation: dsh-stash-panel-in 0.18s cubic-bezier(0.2, 0, 0, 1); transform-origin: 100% 100%;
+}
+.dsh-stash-head { display: flex; align-items: center; gap: 8px; padding: 14px 16px 0; }
+.dsh-stash-head-title { font-size: 13px; font-weight: 500; letter-spacing: 0.01em; }
+.dsh-stash-head-count { font-size: 12px; color: ${T.text3}; font-variant-numeric: tabular-nums; }
+.dsh-stash-head .spacer { flex: 1; }
+.dsh-stash-tbtn {
+  background: none; border: none; color: ${T.text3}; font-size: 12px; font-family: inherit;
+  padding: 4px 8px; border-radius: 6px; cursor: pointer;
+  transition: background 0.12s cubic-bezier(0.2, 0, 0, 1), color 0.12s cubic-bezier(0.2, 0, 0, 1);
+}
+.dsh-stash-tbtn:hover:not(:disabled) { color: ${T.text1}; background: ${T.bgRaised}; }
+.dsh-stash-tbtn:disabled { opacity: 0.4; cursor: default; }
+.dsh-stash-tbtn.danger:hover:not(:disabled) { color: ${T.rose}; background: rgba(201, 146, 146, 0.09); }
+
+.dsh-stash-ask { padding: 14px 16px 4px; }
+.dsh-stash-ask-row { display: flex; gap: 8px; }
+.dsh-stash-input {
+  flex: 1; min-width: 0; height: 32px; padding: 0 10px;
+  background: ${T.bgInset}; border: 0.5px solid transparent; border-radius: 8px;
+  color: ${T.text1}; font-size: 13px; font-family: inherit; outline: none;
+  transition: border-color 0.15s cubic-bezier(0.2, 0, 0, 1);
+}
+.dsh-stash-input::placeholder { color: ${T.text3}; }
+.dsh-stash-input:focus { border-color: ${T.sageLine}; }
+.dsh-stash-go {
+  width: 32px; height: 32px; border-radius: 8px; border: none; cursor: pointer;
+  background: ${T.sage}; color: ${T.sageInk};
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s cubic-bezier(0.2, 0, 0, 1);
+}
+.dsh-stash-go:hover:not(:disabled) { background: #b3c6b5; }
+.dsh-stash-go:disabled { opacity: 0.6; cursor: default; }
+.dsh-stash-spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(29, 34, 30, 0.3); border-top-color: ${T.sageInk};
+  animation: dsh-stash-spin 0.7s linear infinite;
+}
+.dsh-stash-ctx { display: flex; align-items: center; gap: 7px; margin-top: 10px; font-size: 12px; color: ${T.text2}; cursor: pointer; user-select: none; }
+.dsh-stash-ctx input { accent-color: ${T.sage}; width: 13px; height: 13px; margin: 0; }
+
+.dsh-stash-answer { margin: 12px 16px 4px; padding: 2px 0 2px 12px; border-left: 2px solid ${T.sageLine}; font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; max-height: 24vh; overflow-y: auto; overscroll-behavior: contain; }
+.dsh-stash-skeleton { display: flex; flex-direction: column; gap: 8px; }
+.dsh-stash-sk { height: 10px; border-radius: 4px; background: ${T.bgRaised}; animation: dsh-stash-pulse 1.2s ease-in-out infinite; }
+.dsh-stash-sk:nth-child(2) { width: 82%; animation-delay: 0.15s; }
+.dsh-stash-sk:nth-child(3) { width: 64%; animation-delay: 0.3s; }
+
+.dsh-stash-hr { height: 0.5px; background: ${T.line}; margin: 14px 16px 0; }
+.dsh-stash-tags-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 0; }
+.dsh-stash-tags-hint { font-size: 12px; color: ${T.text3}; font-variant-numeric: tabular-nums; }
+.dsh-stash-tags-head .ops { display: flex; gap: 2px; }
+.dsh-stash-tags {
+  display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start;
+  padding: 12px 16px 16px; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  max-height: 40vh; /* 兜底：即使宿主环境令面板 max-height 失效，标签区自身仍出滚动条 */
+}
+.dsh-stash-tags::-webkit-scrollbar { width: 4px; }
+.dsh-stash-tags::-webkit-scrollbar-thumb { background: ${T.line2}; border-radius: 2px; }
+.dsh-stash-tag {
+  display: inline-flex; align-items: center; max-width: 100%; height: 28px; padding: 0 11px;
+  border-radius: 999px; background: transparent; border: 0.5px solid ${T.line2};
+  color: ${T.text1}; font-size: 12px; line-height: 16px; cursor: pointer; user-select: none;
+  transition: background 0.12s cubic-bezier(0.2, 0, 0, 1), border-color 0.12s cubic-bezier(0.2, 0, 0, 1), color 0.12s cubic-bezier(0.2, 0, 0, 1);
+}
+.dsh-stash-tag:hover { background: ${T.bgRaised}; }
+.dsh-stash-tag .txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.dsh-stash-tag.sel { background: ${T.sageTint}; border-color: ${T.sageLine}; color: ${T.sageText}; }
+.dsh-stash-tag .dot { width: 5px; height: 5px; border-radius: 50%; background: ${T.sage}; margin-right: 7px; flex: none; }
+.dsh-stash-empty { padding: 26px 0 30px; text-align: center; color: ${T.text3}; font-size: 12px; width: 100%; }
+.dsh-stash-empty .ic { display: flex; justify-content: center; margin-bottom: 10px; opacity: 0.7; }
+
+.dsh-stash-toast {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 5;
+  display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px;
+  background: rgba(33, 32, 31, 0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 0.5px solid ${T.line2}; font-size: 12px; color: ${T.text1};
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); white-space: nowrap;
+  animation: dsh-stash-in 0.16s cubic-bezier(0.2, 0, 0, 1);
+}
+`
+
+/* ── 线性 SVG 图标（替代 emoji）── */
+function IconDrawer({ size = 14, color = 'currentColor' }: { size?: number, color?: string }): ReactElement {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.7" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 9h16v11H4z" /><path d="M4 9l2.5-5h11L20 9" /><path d="M10 13.5h4" />
+    </svg>
+  )
+}
+function IconAsk({ size = 13, color = 'currentColor' }: { size?: number, color?: string }): ReactElement {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7 17L17 7" /><path d="M9 7h8v8" />
+    </svg>
+  )
+}
+function IconCheck({ size = 12, color = 'currentColor' }: { size?: number, color?: string }): ReactElement {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 8.5l3.2 3.2L13 5" />
+    </svg>
+  )
 }
 
-export function createStashOverlay(remote: StashRemote): () => ReactElement {
+/** 哨兵探针组件（api-contract.md §2.3 L1）：挂进 conversation.chat.node，
+ * 每条消息一个，DOM 根登记进 ConversationScope；display:none 不影响树位置。 */
+export function createConversationProbe(scope: ConversationScope): () => ReactElement {
+  return function ConversationProbe(): ReactElement {
+    const ref = useRef<HTMLSpanElement | null>(null)
+    useEffect(() => {
+      const el = ref.current
+      if (el === null) return
+      return scope.registerProbe(el)
+    }, [])
+    return <span ref={ref} aria-hidden="true" style={{ display: 'none' }} />
+  }
+}
+
+export function createStashOverlay(remote: StashRemote, scope: ConversationScope): () => ReactElement {
   return function StashOverlay(): ReactElement {
     const [open, setOpen] = useState(false)
     const [items, setItems] = useState<StashItem[]>([])
@@ -221,10 +234,18 @@ export function createStashOverlay(remote: StashRemote): () => ReactElement {
     const [toast, setToast] = useState<string | null>(null)
     const rootRef = useRef<HTMLDivElement | null>(null)
     const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+    const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+    const collectedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+    const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+    /** 「已收藏」变形进行中（事件处理器里要读，不能依赖异步的 state） */
+    const collectedRef = useRef(false)
 
     useEffect(() => {
       return () => {
         if (toastTimer.current !== undefined) clearTimeout(toastTimer.current)
+        if (hideTimer.current !== undefined) clearTimeout(hideTimer.current)
+        if (collectedTimer.current !== undefined) clearTimeout(collectedTimer.current)
+        if (settleTimer.current !== undefined) clearTimeout(settleTimer.current)
       }
     }, [])
 
@@ -247,19 +268,42 @@ export function createStashOverlay(remote: StashRemote): () => ReactElement {
       if (open) refreshList()
     }, [open])
 
-    // 选区捕获：在选区附近浮出 Notion 式菜单（面板内 / 输入框内 / 可编辑区不捕获）
+    // 点击面板外空白折叠（选区菜单与 FAB 都在 rootRef 内，不受影响）
     useEffect(() => {
-      const update = (): void => {
+      if (!open) return
+      const onPointerDown = (event: MouseEvent): void => {
+        if (rootRef.current === null) return
+        if (event.target instanceof Node && rootRef.current.contains(event.target)) return
+        setOpen(false)
+      }
+      document.addEventListener('mousedown', onPointerDown)
+      return () => document.removeEventListener('mousedown', onPointerDown)
+    }, [open])
+
+    /** 菜单收起（100ms 淡出）；幂等，可被随后的 evaluate 打断。 */
+    const requestHideMenu = (): void => {
+      if (hideTimer.current !== undefined) clearTimeout(hideTimer.current)
+      setMenu(prev => prev === null || prev.phase === 'exiting' ? prev : { ...prev, phase: 'exiting' })
+      hideTimer.current = setTimeout(() => {
+        setMenu(null)
+        hideTimer.current = undefined
+      }, MENU_EXIT_MS + 20)
+    }
+
+    // 选区捕获（§2.3）：mouseup 单次定位 + 键盘选区防抖 + L0/L1/L2 三层漏斗
+    useEffect(() => {
+      const evaluate = (): void => {
         const sel = window.getSelection()
-        if (sel === null || sel.rangeCount === 0 || sel.anchorNode === null) { setMenu(null); return }
-        if (rootRef.current?.contains(sel.anchorNode)) { setMenu(null); return }
-        if (isEditable(sel.anchorNode)) { setMenu(null); return }
+        if (sel === null || sel.rangeCount === 0 || sel.anchorNode === null || sel.isCollapsed) { requestHideMenu(); return }
+        if (rootRef.current?.contains(sel.anchorNode) === true) { requestHideMenu(); return } // L0 面板内
+        if (isEditable(sel.anchorNode)) { requestHideMenu(); return } // L0 可编辑区
         const text = sel.toString().trim()
-        if (text.length === 0) { setMenu(null); return }
-        const rect = sel.getRangeAt(0).getBoundingClientRect()
-        if (rect.width === 0 && rect.height === 0) { setMenu(null); return }
-        const menuWidth = 168
-        const menuHeight = 36
+        if (text.length === 0) { requestHideMenu(); return } // L0 空文本
+        if (!scope.contains(sel.anchorNode)) { requestHideMenu(); return } // L1 容器归属
+        const rect = sel.getRangeAt(0).getBoundingClientRect() // L2 内容校验
+        if (rect.width === 0 && rect.height === 0) { requestHideMenu(); return }
+        const menuWidth = 190
+        const menuHeight = 34
         const gap = 8
         const x = Math.min(Math.max(rect.left + rect.width / 2, menuWidth / 2 + 8), window.innerWidth - menuWidth / 2 - 8)
         let placement: 'top' | 'bottom' = 'top'
@@ -268,16 +312,57 @@ export function createStashOverlay(remote: StashRemote): () => ReactElement {
           placement = 'bottom'
           y = rect.bottom + gap
         }
-        setMenu({ x, y, placement, text })
+        // 新选区出现即取消「已收藏」变形的残留定时器（避免 800ms 后误杀新菜单/选区）
+        if (collectedTimer.current !== undefined) { clearTimeout(collectedTimer.current); collectedTimer.current = undefined }
+        collectedRef.current = false
+        if (hideTimer.current !== undefined) { clearTimeout(hideTimer.current); hideTimer.current = undefined }
+        // 坐标与文本都没变就不重设——防抖路径重复 evaluate 不重启入场动画
+        setMenu(prev => {
+          if (prev !== null && prev.phase === 'actions' && prev.text === text
+            && prev.x === x && prev.y === y && prev.placement === placement) return prev
+          return { x, y, placement, text, phase: 'actions' }
+        })
       }
-      const hideMenu = (): void => setMenu(null)
-      document.addEventListener('mouseup', update)
-      document.addEventListener('selectionchange', update)
-      document.addEventListener('scroll', hideMenu, true)
+
+      const onSelectionChange = (): void => {
+        const sel = window.getSelection()
+        const collapsed = sel === null || sel.rangeCount === 0 || sel.isCollapsed || sel.toString().trim().length === 0
+        if (collapsed) {
+          if (settleTimer.current !== undefined) { clearTimeout(settleTimer.current); settleTimer.current = undefined }
+          // 「已收藏」变形期间清空选区是主动行为，别把变形打断
+          if (!collectedRef.current) requestHideMenu()
+          return
+        }
+        // 键盘选区路径：稳定 KEYBOARD_SETTLE_MS 后才出现（拖选过程中的高频事件只重置计时器）
+        if (settleTimer.current !== undefined) clearTimeout(settleTimer.current)
+        settleTimer.current = setTimeout(() => {
+          settleTimer.current = undefined
+          evaluate()
+        }, KEYBOARD_SETTLE_MS)
+      }
+
+      const onMouseUp = (event: MouseEvent): void => {
+        if (rootRef.current !== null && event.target instanceof Node && rootRef.current.contains(event.target)) return
+        if (settleTimer.current !== undefined) { clearTimeout(settleTimer.current); settleTimer.current = undefined }
+        evaluate()
+      }
+
+      const onKeyDown = (event: KeyboardEvent): void => {
+        if (event.key !== 'Escape') return
+        requestHideMenu()
+        setOpen(false) // Esc 同时折叠抽屉面板
+      }
+
+      document.addEventListener('mouseup', onMouseUp)
+      document.addEventListener('selectionchange', onSelectionChange)
+      document.addEventListener('scroll', requestHideMenu, true)
+      document.addEventListener('keydown', onKeyDown)
       return () => {
-        document.removeEventListener('mouseup', update)
-        document.removeEventListener('selectionchange', update)
-        document.removeEventListener('scroll', hideMenu, true)
+        document.removeEventListener('mouseup', onMouseUp)
+        document.removeEventListener('selectionchange', onSelectionChange)
+        document.removeEventListener('scroll', requestHideMenu, true)
+        document.removeEventListener('keydown', onKeyDown)
+        if (settleTimer.current !== undefined) clearTimeout(settleTimer.current)
       }
     }, [])
 
@@ -290,8 +375,16 @@ export function createStashOverlay(remote: StashRemote): () => ReactElement {
       remote.save({ text, source: 'selection' }).then((carried) => {
         if (!carried.ok) { showToast('请求失败，请重试'); return }
         if (!carried.value.ok) { showToast(carried.value.error.message); return }
-        setMenu(null)
-        clearPageSelection()
+        // FR-4.3：反馈不依赖面板开合——菜单本体变形「已收藏」，800ms 后淡出并清选区
+        setMenu(prev => prev === null ? prev : { ...prev, phase: 'collected' })
+        collectedRef.current = true
+        if (collectedTimer.current !== undefined) clearTimeout(collectedTimer.current)
+        collectedTimer.current = setTimeout(() => {
+          setMenu(null)
+          collectedTimer.current = undefined
+          collectedRef.current = false
+          clearPageSelection()
+        }, COLLECTED_LINGER_MS)
         showToast('已收藏')
         refreshList()
       }).catch(() => showToast('请求失败，请重试'))
@@ -304,9 +397,24 @@ export function createStashOverlay(remote: StashRemote): () => ReactElement {
       setOpen(true)
     }
 
+    /**
+     * 追问文本组装（FR-3.2 + FR-3.3）：选中标签内容 + 输入框追加问题。
+     * 单标签直接拼接（「AskRequest.sessionId」+「是什么」→「AskRequest.sessionId是什么」），
+     * 多标签用 --- 分隔后再拼接输入内容。
+     */
+    const buildQuery = (): string => {
+      const typed = query.trim()
+      const selected = selectedItems.map(item => item.text).join('\n---\n')
+      if (selected.length === 0) return typed
+      if (typed.length === 0) return selected
+      return selected + typed
+    }
+
     const ask = (text?: string): void => {
-      const q = (text ?? query).trim()
+      const q = (text ?? buildQuery()).trim()
       if (q.length === 0) { showToast('请输入或选中要追问的内容'); return }
+      setQuery(q)                // 物化最终追问文本到输入框（透明化：用户看得到实际问了什么）
+      setSelectedIds(new Set())  // 选中已被消费进 query，清空避免重复追问时内容翻倍
       setAskState('pending')
       remote.ask({ query: q, includeContext }).then((carried) => {
         if (!carried.ok) { setAnswer('请求失败，请重试'); setAskState('error'); return }
@@ -334,10 +442,7 @@ export function createStashOverlay(remote: StashRemote): () => ReactElement {
 
     const askSelected = (): void => {
       if (selectedItems.length === 0) return
-      const joined = selectedItems.map(item => item.text).join('\n---\n')
-      setQuery(joined)
-      setSelectedIds(new Set())
-      ask(joined)
+      ask(buildQuery()) // 含选中内容 + 输入框追加问题（与「问」按钮同一组装规则）
     }
 
     const deleteSelected = (): void => {
@@ -352,39 +457,62 @@ export function createStashOverlay(remote: StashRemote): () => ReactElement {
     }
 
     return (
-      <div ref={rootRef} style={style.floating}>
+      <div ref={rootRef} className="dsh-stash-root">
+        <style dangerouslySetInnerHTML={{ __html: CSS }} />
+
         {menu !== null && (
           <div
-            style={{ ...style.menu, left: menu.x, top: menu.y, transform: menu.placement === 'top' ? 'translate(-50%, -100%)' : 'translate(-50%, 0)' }}
+            className={`dsh-stash-menu${menu.phase === 'exiting' ? ' exiting' : ''}`}
+            style={{ left: menu.x, top: menu.y, transform: menu.placement === 'top' ? 'translate(-50%, -100%)' : 'translate(-50%, 0)' }}
             onMouseDown={(event) => { event.preventDefault(); event.stopPropagation() }}
             onMouseUp={(event) => event.stopPropagation()}
           >
-            <button style={{ ...style.menuButton, background: '#3b6ef0', color: '#ffffff' }} onClick={() => collect(menu.text)}>加入抽屉</button>
-            <button style={{ ...style.menuButton, background: 'transparent', color: '#9aa4b8', border: '1px solid #3a4254' }} onClick={() => startAsk(menu.text)}>追问</button>
+            {menu.phase === 'collected' ? (
+              <span className="dsh-stash-menu-done"><IconCheck /> 已收藏</span>
+            ) : (
+              <>
+                <button className="dsh-stash-menu-item" onClick={() => collect(menu.text)}>
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#8fb0ff" strokeWidth="1.5" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M4 2h8v12l-4-3-4 3z" />
+                  </svg>
+                  加入抽屉
+                </button>
+                <button className="dsh-stash-menu-item muted" onClick={() => startAsk(menu.text)}>
+                  <IconAsk size={12} />
+                  追问
+                </button>
+              </>
+            )}
           </div>
         )}
 
         {open ? (
-          <div style={style.panel}>
-            {toast !== null && <div style={style.toast}>{toast}</div>}
-            <div style={style.header}>
-              <span>🗂 随手抽屉{items.length > 0 ? `（${items.length}）` : ''}</span>
-              <button style={style.ghost} onClick={() => setOpen(false)}>收起</button>
+          <div className="dsh-stash-panel">
+            {toast !== null && (
+              <div className="dsh-stash-toast"><IconCheck color={T.sage} /> {toast}</div>
+            )}
+            <div className="dsh-stash-head">
+              <span style={{ color: T.sage, display: 'flex' }}><IconDrawer /></span>
+              <span className="dsh-stash-head-title">随手抽屉</span>
+              <span className="dsh-stash-head-count">{items.length} 条</span>
+              <span className="spacer" />
+              <button className="dsh-stash-tbtn" onClick={() => setOpen(false)}>收起</button>
             </div>
 
-            <div style={style.section}>
-              <div style={style.row}>
+            <div className="dsh-stash-ask">
+              <div className="dsh-stash-ask-row">
                 <input
-                  style={style.input}
+                  className="dsh-stash-input"
                   value={query}
-                  placeholder="输入追问内容，或选中正文后点「追问」…"
+                  placeholder="输入追问，或选中正文后点「追问」…"
                   onChange={event => setQuery(event.target.value)}
+                  onKeyDown={event => { if (event.key === 'Enter') ask() }}
                 />
-                <button style={style.primary} disabled={askState === 'pending'} onClick={() => ask()}>
-                  {askState === 'pending' ? '…' : '问'}
+                <button className="dsh-stash-go" disabled={askState === 'pending'} onClick={() => ask()}>
+                  {askState === 'pending' ? <span className="dsh-stash-spinner" /> : <IconAsk />}
                 </button>
               </div>
-              <label style={style.checkboxRow}>
+              <label className="dsh-stash-ctx">
                 <input
                   type="checkbox"
                   checked={includeContext}
@@ -392,43 +520,55 @@ export function createStashOverlay(remote: StashRemote): () => ReactElement {
                 />
                 加入对话上下文（两种模式都不写入主会话）
               </label>
-              {askState !== 'idle' && <div style={style.answer}>{answer}</div>}
+              {askState === 'pending' && (
+                <div className="dsh-stash-answer" style={{ padding: 0, borderLeft: 'none' }}>
+                  <div className="dsh-stash-skeleton"><div className="dsh-stash-sk" /><div className="dsh-stash-sk" /><div className="dsh-stash-sk" /></div>
+                </div>
+              )}
+              {askState !== 'idle' && askState !== 'pending' && <div className="dsh-stash-answer">{answer}</div>}
             </div>
 
-            <div style={style.tags}>
+            <div className="dsh-stash-hr" />
+
+            <div className="dsh-stash-tags-head">
+              <span className="dsh-stash-tags-hint">
+                {selectedItems.length > 0 ? `已选 ${selectedItems.length} 条，将与输入内容合并追问` : '点选标签，可单选 / 多选'}
+              </span>
+              <span className="ops">
+                <button className="dsh-stash-tbtn" onClick={toggleSelectAll}>{allSelected ? '清空' : '全选'}</button>
+                <button className="dsh-stash-tbtn" disabled={selectedItems.length === 0} onClick={askSelected}>追问选中</button>
+                <button className="dsh-stash-tbtn danger" disabled={selectedItems.length === 0} onClick={deleteSelected}>删除</button>
+              </span>
+            </div>
+            <div className="dsh-stash-tags">
               {items.length === 0 ? (
-                <div style={style.empty}>抽屉是空的，去正文里划选一段文字收藏吧</div>
+                <div className="dsh-stash-empty">
+                  <div className="ic"><IconDrawer size={20} color={T.text3} /></div>
+                  去正文划选一段文字，这里替你收着
+                </div>
               ) : (
-                <>
-                  <div style={style.selectionBar}>
-                    <span style={style.selectionHint}>
-                      {selectedItems.length > 0 ? `已选 ${selectedItems.length} 条` : '点选标签可单选 / 多选'}
-                    </span>
-                    <div style={style.row}>
-                      <button style={style.ghost} onClick={toggleSelectAll}>{allSelected ? '清空' : '全选'}</button>
-                      <button style={style.ghost} disabled={selectedItems.length === 0} onClick={askSelected}>追问选中</button>
-                      <button style={style.danger} disabled={selectedItems.length === 0} onClick={deleteSelected}>删除选中</button>
+                items.map(item => {
+                  const selected = selectedIds.has(item.id)
+                  return (
+                    <div
+                      key={item.id}
+                      className={`dsh-stash-tag${selected ? ' sel' : ''}`}
+                      title={item.text}
+                      onClick={() => toggleTag(item.id)}
+                    >
+                      {selected && <span className="dot" />}
+                      <span className="txt">{item.text}</span>
                     </div>
-                  </div>
-                  {items.map(item => {
-                    const selected = selectedIds.has(item.id)
-                    return (
-                      <div
-                        key={item.id}
-                        style={{ ...style.tag, ...(selected ? style.tagSelected : {}) }}
-                        title={item.text}
-                        onClick={() => toggleTag(item.id)}
-                      >
-                        <span style={style.tagText}>{item.text}</span>
-                      </div>
-                    )
-                  })}
-                </>
+                  )
+                })
               )}
             </div>
           </div>
         ) : (
-          <button style={style.pill} onClick={() => setOpen(true)}>🗂 随手抽屉</button>
+          <button className="dsh-stash-fab" onClick={() => setOpen(true)} title="随手抽屉">
+            <IconDrawer size={15} />
+            <span className="dsh-stash-fab-label">抽屉{items.length > 0 ? ` · ${items.length}` : ''}</span>
+          </button>
         )}
       </div>
     )

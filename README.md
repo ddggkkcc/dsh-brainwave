@@ -60,8 +60,9 @@
 | [`docs/spec/`](docs/spec/) | 技术规范（SDD 核心，spec 即契约） | 可行性评估、架构、API 契约、数据模型 |
 | [`docs/plan/`](docs/plan/) | 规划与执行 | 里程碑、代办 backlog、决策记录 ADR |
 | [`docs/issues/`](docs/issues/) | 问题与风险 | 当前待处理问题、风险与对策 |
+| [`docs/design/`](docs/design/) | 设计稿 | 高保真交互原型、设计令牌参考 |
 | [`src/host/`](src/host/) | 代码：宿主端 | remote + storage + LLM 追问（TypeScript） |
-| [`src/client/`](src/client/) | 代码：客户端 | shell.overlay 浮窗 + 选区捕获（TSX） |
+| [`src/client/`](src/client/) | 代码：客户端 | shell.overlay 浮窗 + 选区捕获 + 选区归属判定（TSX） |
 | [`tests/`](tests/) | 测试 | 契约测试 / 回归 |
 | [`scripts/`](scripts/) | 构建与工具 | build / pack / release 脚本 |
 
@@ -83,8 +84,12 @@
   - hybrid 插件：宿主 `StashService`（`stash` remote 命名空间 + storage-domain 持久化 + `ctx.llm.stream` 一次性追问）+ 客户端 `shell.overlay` 浮窗（开合/选区捕获/收藏删除/追问）。
   - 构建链路：`scripts/build.sh`（host → `lib/host/`）+ `npm run build:client`（tsdown → `lib/client.js`）实测零报错。
   - 注入链路：super-injector HTTP API 实测注入 → 自检（host ✓ / client ✓ / boot manifest 收录）→ 卸载 → 重注成功；卸载无功能残留（junction 删除有 injector 侧 macOS bug，见 [`scripts/README.md`](scripts/README.md)）。
+- [x] 迭代：**选区归属 + UI 重做 + 交互完善**（2026-08-22）
+  - 选区归属判定（[`selectionScope.ts`](src/client/selectionScope.ts)）：哨兵探针 + 最近公共祖先锁定「对话内容容器」，界外文本不再弹菜单——落实「低打扰」原则（契约 [`api-contract.md`](docs/spec/api-contract.md) §2.3）。
+  - 浮窗 UI 重做：暖石墨×鼠尾草设计令牌（克制、低对比、不突兀），高保真原型见 [`stash-ui-redesign.html`](docs/design/stash-ui-redesign.html)。
+  - 交互：标签区滚动、面板折叠三路径（收起 / 点空白 / Escape）、追问时合并选中标签与输入框内容。
 - [x] 待决项已全部拍板（2026-08-20，见 [`open-questions.md`](docs/issues/open-questions.md)）
-- [ ] 下一步：浏览器目检真实 LLM 追问与上下文开关 → 补多条收藏 + 自定义问题合并、点击外部收起和 AC-1~AC-5 回归。
+- [ ] 下一步：真机复测——选区归属精度（探针挂载）、标签区滚动、折叠三路径、追问合并，以及 LLM 真实追问与上下文开关、AC-1~AC-5 回归。
 
 ---
 

@@ -20,7 +20,8 @@
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { STASH_REMOTE } from './remote.js'
-import { createStashOverlay } from './StashOverlay.js'
+import { createConversationScope } from './selectionScope.js'
+import { createConversationProbe, createStashOverlay } from './StashOverlay.js'
 
 /** 外层 fiber：只负责挂载贡献；额外声明 'slots' 仅为过注入器骨架校验（不在本 fiber 使用）。 */
 export const inject = ['remote', 'slots']
@@ -30,7 +31,9 @@ export async function apply(ctx: ClientContext): Promise<void> {
   const unmount = await ctx.remote.$mount(STASH_REMOTE)
   ctx.effect(() => unmount, 'dsh-stash: remote.stash mount')
 
-  // 2. UI 子 fiber：等服务就绪后注册 shell.overlay 浮窗（api-contract.md §2.1）
+  // 2. 选区归属作用域（§2.3 L1）：探针注册表由浮窗与探针两个组件树共享
+  const scope = createConversationScope()
+
   ctx.inject(['remote.stash', 'slots'], (ui) => {
     ui.effect(() => ui.slots.inject('shell.overlay', () => {
       const dispose = ui.slots.register({
@@ -38,10 +41,30 @@ export async function apply(ctx: ClientContext): Promise<void> {
         id: 'stash',
         order: 100,
         label: '随手抽屉',
-      }, createStashOverlay(ui.remote.stash))
+      }, createStashOverlay(ui.remote.stash, scope))
       return () => {
         dispose()
       }
     }), 'dsh-stash: shell.overlay')
+
+    // 3. 哨兵探针（§2.3 L1 容器归属）：挂进 conversation.chat.node（keyed，每条消息一个）。
+    //    槽位名失效/注册抛错不阻塞浮窗——归属判定自动走降级阶梯，仅 warn 一次（NFR-5）。
+    ui.effect(() => {
+      try {
+        return ui.slots.inject('conversation.chat.node', () => {
+          const dispose = ui.slots.register({
+            name: 'conversation.chat.node',
+            id: 'stash-probe',
+            order: 100,
+          }, createConversationProbe(scope))
+          return () => {
+            dispose()
+          }
+        })
+      } catch (error) {
+        console.warn('[dsh-stash] conversation.chat.node 槽位不可用，选区归属判定降级为启发式:', error)
+        return () => {}
+      }
+    }, 'dsh-stash: conversation probe')
   })
 }
